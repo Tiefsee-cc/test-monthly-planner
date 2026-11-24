@@ -120,12 +120,10 @@ const queueFormStatus = document.getElementById("queueFormStatus");
 const queueReceiptDialog = document.getElementById("queueReceiptDialog");
 const queueReceiptClose = document.getElementById("queueReceiptClose");
 const queueReceiptDone = document.getElementById("queueReceiptDone");
-const queueSchedulePanel = document.getElementById("queueSchedulePanel");
 const queueScheduleForm = document.getElementById("queueScheduleForm");
-const queueScheduleDate = document.getElementById("queueScheduleDate");
+const queueScheduleTicket = document.getElementById("queueScheduleTicket");
+const queueScheduleSubmit = document.getElementById("queueScheduleSubmit");
 const queueScheduleStatus = document.getElementById("queueScheduleStatus");
-queueScheduleDate.min = `${YEAR}-01-01`;
-queueScheduleDate.max = `${YEAR}-12-31`;
 const queueReceiptCancel = document.getElementById("queueReceiptCancel");
 const queueReceiptNumber = document.getElementById("queueReceiptNumber");
 const queueReceiptTaskCount = document.getElementById("queueReceiptTaskCount");
@@ -722,12 +720,6 @@ function openQueueReceipt(ticket) {
   queueReceiptTask.textContent = `测试事项：${ticket.taskName}`;
   queueReceiptCancel.hidden = ticket.status === "cancelled" ||
     Boolean(QUEUE_CONFIG.queueUrl && !queueCancelToken(ticket.id));
-  queueSchedulePanel.hidden = ticket.status === "cancelled" || (!QUEUE_CONFIG.queueUrl && !CAN_EDIT);
-  queueSchedulePanel.open = false;
-  queueScheduleForm.reset();
-  queueScheduleDate.value = ticket.scheduledDate;
-  queueScheduleStatus.textContent = "";
-  queueScheduleForm.dataset.ticketId = ticket.id;
   queueReceiptCancel.disabled = false;
   queueReceiptCancel.dataset.ticketId = ticket.id;
   queueReceiptCancel.title = "取消这个排队号";
@@ -1044,7 +1036,7 @@ function renderCalendar() {
         }
       }
       if (!CAN_EDIT) {
-        if (items.length || dayImage) openViewerDialog(cell.month, cell.day);
+        if (QUEUE_CONFIG.queueUrl || items.length || dayImage) openViewerDialog(cell.month, cell.day);
         return;
       }
       if (CAN_EDIT && batchMode) {
@@ -1095,6 +1087,20 @@ function createTaskChip(item) {
   return chip;
 }
 
+function renderScheduleOptions() {
+  const previous = queueScheduleTicket.value;
+  const pending = getActiveQueueTickets().filter((ticket) => ticket.status === "pending");
+  queueScheduleTicket.replaceChildren(new Option("请选择", ""));
+  for (const ticket of pending) {
+    const requester = ticket.requester ? ` · ${ticket.requester}` : "";
+    queueScheduleTicket.add(new Option(`${queueDisplayNumber(ticket)} · ${ticket.taskName}${requester}`, ticket.id));
+  }
+  queueScheduleTicket.value = pending.some((ticket) => ticket.id === previous) ? previous : "";
+  queueScheduleTicket.disabled = !pending.length || Boolean(queueError);
+  queueScheduleSubmit.disabled = queueScheduleTicket.disabled;
+  queueScheduleStatus.textContent = queueError || (pending.length ? "" : "当前没有待排期事项");
+}
+
 function openViewerDialog(month, day) {
   const items = getCalendarItems(month, day);
   const dayImage = getDayImage(month, day);
@@ -1140,11 +1146,21 @@ function openViewerDialog(month, day) {
     viewerDialogList.appendChild(row);
   });
 
+  queueScheduleForm.hidden = !QUEUE_CONFIG.queueUrl && !CAN_EDIT;
+  queueScheduleForm.dataset.date = formatDateKey(new Date(YEAR, month - 1, day, 12));
+  renderScheduleOptions();
   if (!viewerDialog.open) viewerDialog.showModal();
+  if (QUEUE_CONFIG.queueUrl) {
+    loadQueueTickets({ rerender: false }).then(() => {
+      if (viewerDialog.open) renderScheduleOptions();
+      renderAll();
+    });
+  }
   viewerDialogClose.focus();
 }
 
 function renderEditor() {
+  document.getElementById("scheduleSelectedDay").disabled = getSelectedDays().length !== 1;
   const tasks = getPlannedTasks(selected.month, selected.day);
   const tickets = getQueueTicketsForDay(selected.month, selected.day);
   const totalItems = tasks.length + tickets.length;
@@ -2121,6 +2137,10 @@ document.getElementById("closeEditor").addEventListener("click", () => {
   setEditorCollapsed(!collapsed);
 });
 
+document.getElementById("scheduleSelectedDay").addEventListener("click", () => {
+  openViewerDialog(selected.month, selected.day);
+});
+
 viewerDialogClose.addEventListener("click", () => viewerDialog.close());
 
 viewerDialog.addEventListener("click", (event) => {
@@ -2141,9 +2161,9 @@ queueReceiptClose.addEventListener("click", () => queueReceiptDialog.close());
 queueReceiptDone.addEventListener("click", () => queueReceiptDialog.close());
 queueScheduleForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  const ticket = queueTickets.find((item) => item.id === queueScheduleForm.dataset.ticketId);
-  if (!ticket || (!QUEUE_CONFIG.queueUrl && !CAN_EDIT)) return;
-  const date = queueScheduleDate.value;
+  const ticket = queueTickets.find((item) => item.id === queueScheduleTicket.value);
+  if (ticket?.status !== "pending" || (!QUEUE_CONFIG.queueUrl && !CAN_EDIT)) return;
+  const date = queueScheduleForm.dataset.date;
   if (!date) {
     queueScheduleStatus.textContent = "请选择排期日期";
     return;
@@ -2151,11 +2171,11 @@ queueScheduleForm.addEventListener("submit", async (event) => {
   event.submitter.disabled = true;
   try {
     const updated = QUEUE_CONFIG.queueUrl
-      ? await updateHostedQueueTicket(ticket, "schedule", "", date)
+      ? await updateHostedQueueTicket(ticket, "schedule_pending", "", date)
       : { ...ticket, scheduledDate: date, status: "scheduled" };
     queueTickets = queueTickets.map((item) => item.id === ticket.id ? updated : item);
     if (!queueRemoteEnabled()) saveLocalQueueTickets();
-    queueReceiptDialog.close();
+    viewerDialog.close();
     if (updated.scheduledDate) {
       const [, month, day] = updated.scheduledDate.split("-").map(Number);
       currentMonth = month;

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>测试月度取号规划</title>
     <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css?v=20261124-5" />
+    <link rel="stylesheet" href="./styles.css?v=20261124-8" />
   </head>
   <body class="menu-collapsed style-editorial">
     <div class="app-shell">
@@ -125,6 +125,7 @@
           <input id="dayImageInput" type="file" accept="image/jpeg,image/png,image/webp" hidden />
         </section>
 
+        <button type="button" id="scheduleSelectedDay">管理当天排期</button>
         <form class="task-form" id="taskForm">
           <label for="taskInput">事项</label>
           <div class="task-input-row">
@@ -160,6 +161,12 @@
         <div class="viewer-dialog-details">
           <p class="viewer-dialog-summary" id="viewerDialogSummary"></p>
           <div class="viewer-dialog-list" id="viewerDialogList"></div>
+          <form class="queue-form" id="queueScheduleForm">
+            <label for="queueScheduleTicket">选择待排期事项</label>
+            <select id="queueScheduleTicket" required></select>
+            <p class="queue-form-status" id="queueScheduleStatus" role="status"></p>
+            <button class="queue-submit-button" id="queueScheduleSubmit" type="submit">安排到这一天</button>
+          </form>
         </div>
       </div>
     </dialog>
@@ -207,15 +214,6 @@
       <p class="queue-receipt-estimate">排期日期：<strong id="queueReceiptDate">待安排</strong></p>
       <p class="queue-receipt-task" id="queueReceiptTask"></p>
       <p class="queue-receipt-task" id="queueReceiptRequester"></p>
-      <details id="queueSchedulePanel">
-        <summary>管理排期</summary>
-        <form class="queue-form" id="queueScheduleForm">
-          <label for="queueScheduleDate">排期日期</label>
-          <input id="queueScheduleDate" type="date" />
-          <button class="queue-submit-button" type="submit" value="schedule">保存排期</button>
-          <p class="queue-form-status" id="queueScheduleStatus" role="status"></p>
-        </form>
-      </details>
       <div class="queue-receipt-actions">
         <button class="queue-receipt-delete" id="queueReceiptCancel" type="button">取消排队</button>
         <button class="queue-receipt-done" id="queueReceiptDone" type="button">知道了</button>
@@ -224,9 +222,9 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <script src="./queue-config.js?v=20261124-7"></script>
+    <script src="./queue-config.js?v=20261124-8"></script>
     <script src="./queue-admin-config.js"></script>
     <script src="./test-calendar-data.js?v=20261124-2"></script>
-    <script src="./app.js?v=20261124-7"></script>
+    <script src="./app.js?v=20261124-8"></script>
   </body>
 </html>

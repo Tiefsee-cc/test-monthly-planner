@@ -1207,6 +1207,7 @@ body.batch-mode .day-summary {
 }
 
 .queue-form input,
+.queue-form select,
 .queue-form textarea {
   min-height: 42px;
   padding: 9px 10px;
