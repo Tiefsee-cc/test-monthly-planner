@@ -123,11 +123,7 @@ const queueReceiptDone = document.getElementById("queueReceiptDone");
 const queueSchedulePanel = document.getElementById("queueSchedulePanel");
 const queueScheduleForm = document.getElementById("queueScheduleForm");
 const queueScheduleDate = document.getElementById("queueScheduleDate");
-const queueSchedulePassword = document.getElementById("queueSchedulePassword");
 const queueScheduleStatus = document.getElementById("queueScheduleStatus");
-queueSchedulePassword.required = Boolean(QUEUE_CONFIG.queueUrl);
-queueSchedulePassword.hidden = !QUEUE_CONFIG.queueUrl;
-queueSchedulePassword.labels[0].hidden = !QUEUE_CONFIG.queueUrl;
 queueScheduleDate.min = `${YEAR}-01-01`;
 queueScheduleDate.max = `${YEAR}-12-31`;
 const queueReceiptCancel = document.getElementById("queueReceiptCancel");
@@ -808,7 +804,7 @@ function queueCancelToken(id) {
 async function updateHostedQueueTicket(ticket, action, token, scheduledDate) {
   const response = await fetch(queueApiUrl(), {
     method: "PATCH",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
     body: JSON.stringify({ id: ticket.id, action, scheduled_date: scheduledDate })
   });
   if (!response.ok) throw new Error(`queue update failed: ${response.status}`);
@@ -2147,18 +2143,16 @@ queueScheduleForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const ticket = queueTickets.find((item) => item.id === queueScheduleForm.dataset.ticketId);
   if (!ticket || (!QUEUE_CONFIG.queueUrl && !CAN_EDIT)) return;
-  const action = event.submitter.value;
   const date = queueScheduleDate.value;
-  if (action === "schedule" && !date) {
+  if (!date) {
     queueScheduleStatus.textContent = "请选择排期日期";
     return;
   }
-  if (action === "cancel" && !window.confirm("确认取消这个取号？")) return;
   event.submitter.disabled = true;
   try {
     const updated = QUEUE_CONFIG.queueUrl
-      ? await updateHostedQueueTicket(ticket, action, queueSchedulePassword.value.trim(), date)
-      : { ...ticket, scheduledDate: action === "schedule" ? date : "", status: action === "schedule" ? "scheduled" : "cancelled" };
+      ? await updateHostedQueueTicket(ticket, "schedule", "", date)
+      : { ...ticket, scheduledDate: date, status: "scheduled" };
     queueTickets = queueTickets.map((item) => item.id === ticket.id ? updated : item);
     if (!queueRemoteEnabled()) saveLocalQueueTickets();
     queueReceiptDialog.close();
@@ -2170,10 +2164,10 @@ queueScheduleForm.addEventListener("submit", async (event) => {
       selectionAnchor = day;
     }
     renderAll();
-    showToast(action === "schedule" ? "排期已保存" : "已取消取号");
+    showToast("排期已保存");
   } catch (error) {
     console.error(error);
-    queueScheduleStatus.textContent = "操作失败，请检查管理员口令和日期后重试。";
+    queueScheduleStatus.textContent = "排期保存失败，请检查日期后重试。";
   } finally {
     event.submitter.disabled = false;
   }
