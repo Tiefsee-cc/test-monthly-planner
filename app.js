@@ -553,7 +553,7 @@ async function loadQueueTickets({ rerender = true } = {}) {
       queueTickets = loadLocalQueueTickets();
     } else {
       queueTickets = [];
-      queueError = "在线取号服务尚未连接";
+      queueError = "尚未配置共享取号服务，暂时无法在线取号。";
     }
   } catch (error) {
     console.error(error);
@@ -906,20 +906,14 @@ async function createQueueTicket(taskName, requester) {
 }
 
 function renderQueueAvailability() {
-  if (queueLoading) {
-    queueSubmitButton.disabled = true;
-    return;
-  }
-  if (queueError) {
-    queueSubmitButton.disabled = !CAN_EDIT || !queueRemoteEnabled();
-    return;
-  }
-  const nextDate = findNextAvailableDate();
-  queueSubmitButton.disabled = !nextDate;
+  const status = queueLoading
+    ? "正在读取排队信息…"
+    : queueError || (findNextAvailableDate() ? "" : "本年度暂无可安排的工作日。");
+  queueSubmitButton.disabled = Boolean(status);
+  queueFormStatus.textContent = status;
 }
 
 function openQueueDialog() {
-  queueFormStatus.textContent = "";
   renderQueueAvailability();
   if (!queueDialog.open) queueDialog.showModal();
   queueRequesterInput.focus();
