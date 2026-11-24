@@ -12,7 +12,6 @@ const QUEUE_CONFIG = configuredQueue.queueUrl && window.location.hostname !== "t
   ? {}
   : configuredQueue;
 const QUEUE_ADMIN_CONFIG = window.__TEST_CALENDAR_QUEUE_ADMIN_CONFIG__ || {};
-const QUEUE_COLOR = "#eadfce";
 const DEFAULT_TODAY_IMAGE = "./today-card-background-v2.png";
 const DEFAULT_DAY_IMAGE_DATE = formatDateKey(new Date());
 const MAX_DAY_IMAGE_FILE_SIZE = 12 * 1024 * 1024;
@@ -35,6 +34,15 @@ const brandColors = {
   black: "#111111",
   gray: "#eeeeee"
 };
+
+const taskColors = [
+    brandColors.green,
+    brandColors.orange,
+    brandColors.yellow,
+    brandColors.pink,
+    brandColors.purple,
+    brandColors.blue
+  ];
 
 const projectColorMap = {};
 const initialProjects = [];
@@ -258,17 +266,9 @@ function saveView() {
 }
 
 function normalizeProjectColors(projects) {
-  const accentCycle = [
-    brandColors.green,
-    brandColors.orange,
-    brandColors.yellow,
-    brandColors.pink,
-    brandColors.purple,
-    brandColors.blue
-  ];
   return projects.map((project, index) => ({
     ...project,
-    color: project.color || projectColorMap[project.name] || accentCycle[index % accentCycle.length]
+    color: project.color || projectColorMap[project.name] || taskColors[index % taskColors.length]
   }));
 }
 
@@ -390,8 +390,12 @@ function getQueueTicketsForDay(month, day) {
   return queueTickets.filter((ticket) => ticket.scheduledDate === key && ticket.status !== "cancelled");
 }
 
-function queueTicketLabel(ticket) {
-  return `取号 ${ticket.ticketNo}｜${ticket.taskName}`;
+function scheduledTaskColor(ticket) {
+  let hash = 2166136261;
+  for (const character of ticket.id || ticket.ticketNo) {
+    hash = Math.imul(hash ^ character.charCodeAt(0), 16777619);
+  }
+  return taskColors[(hash >>> 0) % taskColors.length];
 }
 
 function getCalendarItems(month, day) {
@@ -402,8 +406,8 @@ function getCalendarItems(month, day) {
   }));
   const queued = getQueueTicketsForDay(month, day).map((ticket) => ({
     type: "queue",
-    label: queueTicketLabel(ticket),
-    color: QUEUE_COLOR,
+    label: ticket.taskName,
+    color: scheduledTaskColor(ticket),
     ticket
   }));
   return [...planned, ...queued];
@@ -1027,14 +1031,6 @@ function renderCalendar() {
     button.appendChild(preview);
 
     button.addEventListener("click", (event) => {
-      const queueChip = event.target instanceof Element ? event.target.closest(".queue-ticket-chip") : null;
-      if (queueChip) {
-        const ticket = queueTickets.find((item) => item.id === queueChip.dataset.ticketId);
-        if (ticket) {
-          openQueueReceipt(ticket);
-          return;
-        }
-      }
       if (!CAN_EDIT) {
         if (QUEUE_CONFIG.queueUrl || items.length || dayImage) openViewerDialog(cell.month, cell.day);
         return;
@@ -1074,13 +1070,9 @@ function renderCalendar() {
 
 function createTaskChip(item) {
   const chip = document.createElement("div");
-  chip.className = `task-chip${item.type === "queue" ? " queue-ticket-chip" : ""}`;
+  chip.className = "task-chip";
   chip.style.setProperty("--chip-color", item.color);
   chip.title = item.label;
-  if (item.type === "queue") {
-    chip.dataset.ticketId = item.ticket.id;
-    chip.title = `${item.label} · 点击查看取号纸`;
-  }
   const text = document.createElement("span");
   text.textContent = item.label;
   chip.appendChild(text);
@@ -1224,7 +1216,7 @@ function renderEditor() {
   tickets.forEach((ticket) => {
     const row = document.createElement("div");
     row.className = "task-row queue-ticket-row";
-    row.style.setProperty("--chip-color", QUEUE_COLOR);
+    row.style.setProperty("--chip-color", scheduledTaskColor(ticket));
 
     const detail = document.createElement("div");
     detail.className = "queue-ticket-row-detail";
