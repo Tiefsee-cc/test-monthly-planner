@@ -2098,3 +2098,15 @@ body.style-editorial .toast {
     font-size: 0.62rem;
   }
 }
+
+body.style-editorial .sidebar[hidden] {
+  display: none;
+}
+
+body.style-editorial .topbar {
+  padding-left: 24px;
+}
+
+.viewer-dialog-details > .queue-form + .queue-form {
+  margin-top: 16px;
+}

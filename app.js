@@ -128,6 +128,10 @@ const queueFormStatus = document.getElementById("queueFormStatus");
 const queueReceiptDialog = document.getElementById("queueReceiptDialog");
 const queueReceiptClose = document.getElementById("queueReceiptClose");
 const queueReceiptDone = document.getElementById("queueReceiptDone");
+const manualItemForm = document.getElementById("manualItemForm");
+const manualItemInput = document.getElementById("manualItemInput");
+const manualItemStatus = document.getElementById("manualItemStatus");
+const manualItemSubmit = document.getElementById("manualItemSubmit");
 const queueScheduleForm = document.getElementById("queueScheduleForm");
 const queueScheduleTicket = document.getElementById("queueScheduleTicket");
 const queueScheduleSubmit = document.getElementById("queueScheduleSubmit");
@@ -405,7 +409,7 @@ function getCalendarItems(month, day) {
     color: getProjectColor(task)
   }));
   const queued = getQueueTicketsForDay(month, day).map((ticket) => ({
-    type: "queue",
+    type: ticket.ticketNo.startsWith("M-") ? "task" : "queue",
     label: ticket.taskName,
     color: scheduledTaskColor(ticket),
     ticket
@@ -1054,6 +1058,7 @@ function renderCalendar() {
       }
       setEditorCollapsed(false);
       renderAll();
+      if (!batchMode) openViewerDialog(cell.month, cell.day);
     });
 
     calendarGrid.appendChild(button);
@@ -1085,7 +1090,7 @@ function renderScheduleOptions() {
   queueScheduleStatus.textContent = queueError || (pending.length ? "" : "当前没有待排期事项");
 }
 
-function openViewerDialog(month, day) {
+function openViewerDialog(month, day, { refresh = true } = {}) {
   const items = getCalendarItems(month, day);
   const dayImage = getDayImage(month, day);
   viewerDialog.classList.toggle("without-illustration", !dayImage);
@@ -1131,10 +1136,17 @@ function openViewerDialog(month, day) {
   });
 
   queueScheduleForm.hidden = !QUEUE_CONFIG.queueUrl && !CAN_EDIT;
-  queueScheduleForm.dataset.date = formatDateKey(new Date(YEAR, month - 1, day, 12));
+  const date = formatDateKey(new Date(YEAR, month - 1, day, 12));
+  queueScheduleForm.dataset.date = date;
+  manualItemForm.hidden = !QUEUE_CONFIG.queueUrl && !CAN_EDIT;
+  if (manualItemForm.dataset.date !== date || !viewerDialog.open) {
+    manualItemForm.reset();
+    manualItemStatus.textContent = "";
+  }
+  manualItemForm.dataset.date = date;
   renderScheduleOptions();
   if (!viewerDialog.open) viewerDialog.showModal();
-  if (QUEUE_CONFIG.queueUrl) {
+  if (refresh && QUEUE_CONFIG.queueUrl) {
     loadQueueTickets({ rerender: false }).then(() => {
       if (viewerDialog.open) renderScheduleOptions();
       renderAll();
@@ -1205,7 +1217,7 @@ function renderEditor() {
     taskList.appendChild(row);
   });
 
-  tickets.forEach((ticket) => {
+  tickets.filter((ticket) => !ticket.ticketNo.startsWith("M-")).forEach((ticket) => {
     const row = document.createElement("div");
     row.className = "task-row queue-ticket-row";
     row.style.setProperty("--chip-color", scheduledTaskColor(ticket));
@@ -2143,6 +2155,41 @@ queueListClose.addEventListener("click", () => queueListDialog.close());
 queueDialogClose.addEventListener("click", () => queueDialog.close());
 queueReceiptClose.addEventListener("click", () => queueReceiptDialog.close());
 queueReceiptDone.addEventListener("click", () => queueReceiptDialog.close());
+manualItemForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!QUEUE_CONFIG.queueUrl && !CAN_EDIT) return;
+  const task = manualItemInput.value.trim();
+  const date = manualItemForm.dataset.date;
+  if (!task) {
+    manualItemStatus.textContent = "请输入事项说明";
+    return;
+  }
+  const [, month, day] = date.split("-").map(Number);
+  manualItemSubmit.disabled = true;
+  manualItemStatus.textContent = "正在保存…";
+  try {
+    if (QUEUE_CONFIG.queueUrl) {
+      const item = await insertRemoteQueueTicket({ action: "add_item", task_name: task, scheduled_date: date });
+      queueTickets = [...queueTickets.filter((ticket) => ticket.id !== item.id), item];
+    } else {
+      addProjectIfNeeded(task);
+      setTasks(month, day, [...getPlannedTasks(month, day), task]);
+    }
+    renderAll();
+    if (viewerDialog.open && manualItemForm.dataset.date === date) {
+      manualItemForm.reset();
+      manualItemStatus.textContent = "事项已添加";
+      openViewerDialog(month, day, { refresh: false });
+    }
+    showToast("事项已添加");
+  } catch (error) {
+    console.error(error);
+    if (manualItemForm.dataset.date === date) manualItemStatus.textContent = "保存失败，请稍后重试";
+  } finally {
+    manualItemSubmit.disabled = false;
+  }
+});
+
 queueScheduleForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const ticket = queueTickets.find((item) => item.id === queueScheduleTicket.value);

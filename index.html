@@ -5,11 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>测试月度取号规划</title>
     <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css?v=20261124-9" />
+    <link rel="stylesheet" href="./styles.css?v=20261124-11" />
   </head>
   <body class="menu-collapsed style-editorial">
     <div class="app-shell">
-      <aside class="sidebar" aria-label="计划设置">
+      <aside hidden class="sidebar" aria-label="计划设置">
         <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-expanded="false" title="展开设置">
           <span class="toggle-icon">☰</span>
           <span class="toggle-label">设置</span>
@@ -167,6 +167,12 @@
             <p class="queue-form-status" id="queueScheduleStatus" role="status"></p>
             <button class="queue-submit-button" id="queueScheduleSubmit" type="submit">安排到这一天</button>
           </form>
+          <form class="queue-form" id="manualItemForm">
+            <label for="manualItemInput">手动添加事项</label>
+            <input id="manualItemInput" type="text" maxlength="120" placeholder="输入事项说明" required />
+            <p class="queue-form-status" id="manualItemStatus" role="status"></p>
+            <button class="queue-submit-button" id="manualItemSubmit" type="submit">添加事项</button>
+          </form>
         </div>
       </div>
     </dialog>
@@ -225,6 +231,6 @@
     <script src="./queue-config.js?v=20261124-8"></script>
     <script src="./queue-admin-config.js"></script>
     <script src="./test-calendar-data.js?v=20261124-2"></script>
-    <script src="./app.js?v=20261124-10"></script>
+    <script src="./app.js?v=20261124-11"></script>
   </body>
 </html>
