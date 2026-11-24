@@ -136,6 +136,16 @@ const queueScheduleForm = document.getElementById("queueScheduleForm");
 const queueScheduleTicket = document.getElementById("queueScheduleTicket");
 const queueScheduleSubmit = document.getElementById("queueScheduleSubmit");
 const queueScheduleStatus = document.getElementById("queueScheduleStatus");
+const queueReceiptMove = document.getElementById("queueReceiptMove");
+const moveItemDialog = document.getElementById("moveItemDialog");
+const moveItemForm = document.getElementById("moveItemForm");
+const moveItemDate = document.getElementById("moveItemDate");
+const moveItemName = document.getElementById("moveItemName");
+const moveItemStatus = document.getElementById("moveItemStatus");
+const moveItemSubmit = document.getElementById("moveItemSubmit");
+moveItemDate.min = `${YEAR}-01-01`;
+moveItemDate.max = `${YEAR}-12-31`;
+let itemToMove = null;
 const queueReceiptCancel = document.getElementById("queueReceiptCancel");
 const queueReceiptNumber = document.getElementById("queueReceiptNumber");
 const queueReceiptTaskCount = document.getElementById("queueReceiptTaskCount");
@@ -719,7 +729,8 @@ function openQueueReceipt(ticket) {
   queueReceiptRequester.textContent = `取号人：${ticket.requester || "未填写"}`;
   queueReceiptTask.textContent = `测试事项：${ticket.taskName}`;
   queueReceiptCancel.hidden = ticket.status === "cancelled" ||
-    Boolean(QUEUE_CONFIG.queueUrl && !queueCancelToken(ticket.id));
+    Boolean(QUEUE_CONFIG.queueUrl && ticket.status !== "scheduled" && !queueCancelToken(ticket.id));
+  queueReceiptMove.hidden = ticket.status !== "scheduled" || (!QUEUE_CONFIG.queueUrl && !CAN_EDIT);
   queueReceiptCancel.disabled = false;
   queueReceiptCancel.dataset.ticketId = ticket.id;
   queueReceiptCancel.title = "取消这个排队号";
@@ -797,7 +808,9 @@ async function updateHostedQueueTicket(ticket, action, token, scheduledDate) {
   const response = await fetch(queueApiUrl(), {
     method: "PATCH",
     headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-    body: JSON.stringify({ id: ticket.id, action, scheduled_date: scheduledDate })
+    body: JSON.stringify({
+      id: ticket.id, action, scheduled_date: scheduledDate, previous_date: ticket.scheduledDate
+    })
   });
   if (!response.ok) throw new Error(`queue update failed: ${response.status}`);
   const [row] = await response.json();
@@ -833,7 +846,7 @@ async function cancelQueueTicket(ticket) {
 }
 
 async function confirmAndCancelQueueTicket(ticket, button) {
-  if (!ticket || !window.confirm(`确认取消排队 ${queueDisplayNumber(ticket)}「${ticket.taskName}」吗？`)) return;
+  if (!ticket || !window.confirm(`确认取消取号 ${queueDisplayNumber(ticket)}「${ticket.taskName}」吗？`)) return;
   const previousText = button?.textContent;
   if (button) {
     button.disabled = true;
@@ -843,7 +856,7 @@ async function confirmAndCancelQueueTicket(ticket, button) {
     await cancelQueueTicket(ticket);
     if (queueReceiptDialog.open) queueReceiptDialog.close();
     renderAll();
-    showToast("已取消排队");
+    showToast("已取消取号");
   } catch (error) {
     console.error(error);
     showToast("取消失败，请稍后重试");
@@ -1133,6 +1146,17 @@ function openViewerDialog(month, day, { refresh = true } = {}) {
     }
     row.append(swatch, detail);
     viewerDialogList.appendChild(row);
+    if (item.type === "task" && (item.ticket ? QUEUE_CONFIG.queueUrl : CAN_EDIT)) {
+      row.classList.add("with-date-action");
+      const move = document.createElement("button");
+      move.type = "button";
+      move.textContent = "修改日期";
+      move.setAttribute("aria-label", `修改「${item.label}」的日期`);
+      move.addEventListener("click", () => {
+        openMoveItemDialog(item, formatDateKey(new Date(YEAR, month - 1, day, 12)));
+      });
+      row.appendChild(move);
+    }
   });
 
   queueScheduleForm.hidden = !QUEUE_CONFIG.queueUrl && !CAN_EDIT;
@@ -2155,6 +2179,70 @@ queueListClose.addEventListener("click", () => queueListDialog.close());
 queueDialogClose.addEventListener("click", () => queueDialog.close());
 queueReceiptClose.addEventListener("click", () => queueReceiptDialog.close());
 queueReceiptDone.addEventListener("click", () => queueReceiptDialog.close());
+function openMoveItemDialog(item, date) {
+  itemToMove = { ...item, date };
+  moveItemName.textContent = item.label;
+  moveItemDate.value = date;
+  moveItemStatus.textContent = "";
+  moveItemDialog.showModal();
+}
+
+queueReceiptMove.addEventListener("click", () => {
+  const ticket = queueTickets.find((item) => item.id === queueReceiptCancel.dataset.ticketId);
+  if (ticket?.status === "scheduled") {
+    openMoveItemDialog({ ticket, label: ticket.taskName }, ticket.scheduledDate);
+  }
+});
+
+document.getElementById("moveItemClose").addEventListener("click", () => moveItemDialog.close());
+
+moveItemForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const item = itemToMove;
+  const date = moveItemDate.value;
+  if (!item || !date || date === item.date) {
+    moveItemStatus.textContent = "请选择不同的日期";
+    return;
+  }
+  const [, month, day] = date.split("-").map(Number);
+  moveItemSubmit.disabled = true;
+  moveItemStatus.textContent = "正在保存…";
+  try {
+    if (item.ticket) {
+      const ticket = item.ticket;
+      const updated = QUEUE_CONFIG.queueUrl
+        ? await updateHostedQueueTicket(ticket, "move", "", date)
+        : { ...ticket, scheduledDate: date };
+      queueTickets = queueTickets.map((entry) => entry.id === ticket.id ? updated : entry);
+      if (!queueRemoteEnabled()) saveLocalQueueTickets();
+    } else {
+      const [, oldMonth, oldDay] = item.date.split("-").map(Number);
+      const destination = getPlannedTasks(month, day);
+      if (destination.includes(item.label)) {
+        moveItemStatus.textContent = "目标日期已有同名事项";
+        return;
+      }
+      setTasks(month, day, [...destination, item.label]);
+      setTasks(oldMonth, oldDay, getPlannedTasks(oldMonth, oldDay).filter((task) => task !== item.label));
+    }
+    moveItemDialog.close();
+    if (queueReceiptDialog.open) queueReceiptDialog.close();
+    if (viewerDialog.open) viewerDialog.close();
+    currentMonth = month;
+    selected = { month, day };
+    selectedDays = [day];
+    selectionAnchor = day;
+    renderAll();
+    openViewerDialog(month, day, { refresh: false });
+    showToast("日期已修改");
+  } catch (error) {
+    console.error(error);
+    moveItemStatus.textContent = "日期保存失败，事项可能已变更。请刷新后重试。";
+  } finally {
+    moveItemSubmit.disabled = false;
+  }
+});
+
 manualItemForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!QUEUE_CONFIG.queueUrl && !CAN_EDIT) return;

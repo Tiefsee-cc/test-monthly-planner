@@ -2110,3 +2110,11 @@ body.style-editorial .topbar {
 .viewer-dialog-details > .queue-form + .queue-form {
   margin-top: 16px;
 }
+
+.viewer-dialog-task.with-date-action {
+  grid-template-columns: 14px minmax(0, 1fr) auto;
+}
+
+.viewer-dialog-task.with-date-action button {
+  white-space: nowrap;
+}
