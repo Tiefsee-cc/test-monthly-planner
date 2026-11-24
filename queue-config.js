@@ -1,0 +1,1 @@
+window.__TEST_CALENDAR_QUEUE_CONFIG__ = {};
