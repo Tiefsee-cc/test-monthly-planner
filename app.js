@@ -619,7 +619,7 @@ function isQueueWorkday(date) {
 
 function queueDisplayNumber(ticket) {
   if (/^A[0-9]+$/.test(ticket.ticketNo)) return ticket.ticketNo;
-  const activeTickets = queueTickets
+  const pendingTickets = queueTickets
     .filter((item) => item.status !== "cancelled")
     .slice()
     .sort((a, b) => {
@@ -627,30 +627,22 @@ function queueDisplayNumber(ticket) {
       const second = b.createdAt || b.scheduledDate || b.ticketNo;
       return first.localeCompare(second) || a.ticketNo.localeCompare(b.ticketNo);
     });
-  const index = activeTickets.findIndex((item) => item.id === ticket.id || item.ticketNo === ticket.ticketNo);
+  const index = pendingTickets.findIndex((item) => item.id === ticket.id || item.ticketNo === ticket.ticketNo);
   return `A${Math.max(index, 0) + 1}`;
 }
 
-function getActiveQueueTickets() {
+function getPendingQueueTickets() {
   return queueTickets
-    .filter((ticket) => ticket.status !== "cancelled")
-    .slice()
+    .filter((ticket) => ticket.status === "pending" && !ticket.scheduledDate)
     .sort((a, b) => (a.createdAt || a.ticketNo).localeCompare(b.createdAt || b.ticketNo)
       || a.ticketNo.localeCompare(b.ticketNo, undefined, { numeric: true }));
 }
 
-function formatQueueListDate(dateKey) {
-  const date = parseQueueDate(dateKey);
-  if (!date) return "待安排";
-  const weekday = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"][date.getDay()];
-  return `${date.getMonth() + 1} 月 ${date.getDate()} 日 · ${weekday}`;
-}
-
 function renderQueueList() {
-  const activeTickets = getActiveQueueTickets();
-  queueListCount.textContent = String(activeTickets.length);
-  queueListCount.setAttribute("aria-label", `${activeTickets.length} 个排队取号`);
-  queueListOpenButton.classList.toggle("has-queue", activeTickets.length > 0);
+  const pendingTickets = getPendingQueueTickets();
+  queueListCount.textContent = String(pendingTickets.length);
+  queueListCount.setAttribute("aria-label", `${pendingTickets.length} 个排队取号`);
+  queueListOpenButton.classList.toggle("has-queue", pendingTickets.length > 0);
   queueList.innerHTML = "";
 
   if (queueLoading) {
@@ -663,11 +655,11 @@ function renderQueueList() {
     return;
   }
 
-  queueListSummary.textContent = activeTickets.length
-    ? `共 ${activeTickets.length} 个待处理取号，点击可查看排队纸`
-    : "当前没有待处理的取号";
+  queueListSummary.textContent = pendingTickets.length
+    ? `共 ${pendingTickets.length} 个事项待排期`
+    : "当前没有待排期事项";
 
-  activeTickets.forEach((ticket) => {
+  pendingTickets.forEach((ticket) => {
     const item = document.createElement("button");
     item.type = "button";
     item.className = "queue-list-item";
@@ -684,7 +676,7 @@ function renderQueueList() {
     task.textContent = ticket.taskName;
 
     const meta = document.createElement("small");
-    meta.textContent = `${formatQueueListDate(ticket.scheduledDate)} · ${ticket.ticketNo}${ticket.requester ? ` · ${ticket.requester}` : ""}`;
+    meta.textContent = `${ticket.requester || "未填写取号人"}`;
 
     const arrow = document.createElement("span");
     arrow.className = "queue-list-arrow";
@@ -712,8 +704,8 @@ async function openQueueListDialog() {
 function openQueueReceipt(ticket) {
   const scheduledDate = parseQueueDate(ticket.scheduledDate);
   queueReceiptNumber.textContent = queueDisplayNumber(ticket);
-  queueReceiptTaskCount.textContent = String(getActiveQueueTickets().filter((item) =>
-    item.status === "pending" && item.id !== ticket.id &&
+  queueReceiptTaskCount.textContent = String(getPendingQueueTickets().filter((item) =>
+    item.id !== ticket.id &&
     (item.createdAt < ticket.createdAt || (item.createdAt === ticket.createdAt &&
       item.ticketNo.localeCompare(ticket.ticketNo, undefined, { numeric: true }) < 0))
   ).length);
@@ -1081,7 +1073,7 @@ function createTaskChip(item) {
 
 function renderScheduleOptions() {
   const previous = queueScheduleTicket.value;
-  const pending = getActiveQueueTickets().filter((ticket) => ticket.status === "pending");
+  const pending = getPendingQueueTickets();
   queueScheduleTicket.replaceChildren(new Option("请选择", ""));
   for (const ticket of pending) {
     const requester = ticket.requester ? ` · ${ticket.requester}` : "";
