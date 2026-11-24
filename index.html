@@ -36,7 +36,7 @@
           </div>
           <div class="project-list" id="projectList"></div>
           <form class="project-form" id="projectForm">
-            <input id="projectNameInput" type="text" placeholder="需求名或 Bug 名" autocomplete="off" />
+            <input id="projectNameInput" type="text" placeholder="事项说明" autocomplete="off" />
             <input id="projectColorInput" type="color" value="#70d900" title="选择事项颜色" />
             <button type="submit">添加</button>
           </form>
@@ -126,9 +126,9 @@
         </section>
 
         <form class="task-form" id="taskForm">
-          <label for="taskInput">需求或 Bug</label>
+          <label for="taskInput">事项</label>
           <div class="task-input-row">
-            <input id="taskInput" type="text" list="projectSuggestions" placeholder="输入需求名或 Bug 名" autocomplete="off" />
+            <input id="taskInput" type="text" list="projectSuggestions" placeholder="输入事项说明" autocomplete="off" />
             <button type="submit">添加</button>
           </div>
           <datalist id="projectSuggestions"></datalist>
@@ -174,13 +174,10 @@
       </div>
 
       <form class="queue-form" id="queueForm">
-        <label for="queueItemType">事项类型</label>
-        <select id="queueItemType" name="itemType">
-          <option value="需求">需求</option>
-          <option value="Bug">Bug</option>
-        </select>
-        <label for="queueTaskInput">需求名或 Bug 名</label>
-        <textarea id="queueTaskInput" name="taskName" rows="3" maxlength="116" required></textarea>
+        <label for="queueRequesterInput">取号人</label>
+        <input id="queueRequesterInput" name="requester" type="text" maxlength="40" required />
+        <label for="queueTaskInput">事项说明</label>
+        <textarea id="queueTaskInput" name="taskName" rows="3" maxlength="120" required></textarea>
 
         <p class="queue-form-status" id="queueFormStatus" role="status" aria-live="polite"></p>
         <button class="queue-submit-button" id="queueSubmitButton" type="submit">确认取号</button>
@@ -213,6 +210,7 @@
         （估计等待时间 <strong id="queueReceiptDayCount">0</strong> 个工作日）
       </p>
       <p class="queue-receipt-task" id="queueReceiptTask"></p>
+      <p class="queue-receipt-task" id="queueReceiptRequester"></p>
       <div class="queue-receipt-actions">
         <button class="queue-receipt-delete" id="queueReceiptCancel" type="button">取消排队</button>
         <button class="queue-receipt-done" id="queueReceiptDone" type="button">知道了</button>
@@ -223,7 +221,7 @@
 
     <script src="./queue-config.js"></script>
     <script src="./queue-admin-config.js"></script>
-    <script src="./test-calendar-data.js?v=20261123-1"></script>
-    <script src="./app.js?v=20261123-1"></script>
+    <script src="./test-calendar-data.js?v=20261124-2"></script>
+    <script src="./app.js?v=20261124-2"></script>
   </body>
 </html>
