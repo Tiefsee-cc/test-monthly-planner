@@ -7,7 +7,10 @@ const EMBEDDED_SNAPSHOT_KEY = "__TEST_CALENDAR_SNAPSHOT__";
 const PALETTE_VERSION = 3;
 const DEFAULT_THEME = "fresh";
 const QUEUE_LOCAL_KEY = `test-calendar-queue-${YEAR}-v1`;
-const QUEUE_CONFIG = window.__TEST_CALENDAR_QUEUE_CONFIG__ || {};
+const configuredQueue = window.__TEST_CALENDAR_QUEUE_CONFIG__ || {};
+const QUEUE_CONFIG = configuredQueue.queueUrl && window.location.hostname !== "tiefsee-cc.github.io"
+  ? {}
+  : configuredQueue;
 const QUEUE_ADMIN_CONFIG = window.__TEST_CALENDAR_QUEUE_ADMIN_CONFIG__ || {};
 const QUEUE_COLOR = "#eadfce";
 const DEFAULT_TODAY_IMAGE = "./today-card-background-v2.png";
@@ -504,14 +507,17 @@ function buildCalendarDays(month) {
 }
 
 function queueRemoteEnabled() {
+  if (QUEUE_CONFIG.queueUrl) return true;
   return Boolean(String(QUEUE_CONFIG.supabaseUrl || "").trim() && String(QUEUE_CONFIG.supabaseAnonKey || "").trim());
 }
 
 function queueApiUrl() {
+  if (QUEUE_CONFIG.queueUrl) return QUEUE_CONFIG.queueUrl;
   return `${String(QUEUE_CONFIG.supabaseUrl || "").replace(/\/$/, "")}/rest/v1/test_queue_tickets`;
 }
 
 function queueApiHeaders(extra = {}) {
+  if (QUEUE_CONFIG.queueUrl) return { ...extra };
   const key = String(QUEUE_CONFIG.supabaseAnonKey || "").trim();
   return {
     apikey: key,
@@ -541,7 +547,7 @@ async function loadQueueTickets({ rerender = true } = {}) {
 
   try {
     if (queueRemoteEnabled()) {
-      const url = `${queueApiUrl()}?select=id,ticket_no,requester,task_name,scheduled_date,status,created_at&order=scheduled_date.asc,created_at.asc`;
+      const url = QUEUE_CONFIG.queueUrl || `${queueApiUrl()}?select=id,ticket_no,requester,task_name,scheduled_date,status,created_at&order=scheduled_date.asc,created_at.asc`;
       const response = await fetch(url, {
         headers: queueApiHeaders(),
         cache: "no-store"
@@ -730,7 +736,7 @@ function openQueueReceipt(ticket) {
     : "待安排";
   queueReceiptRequester.textContent = `取号人：${ticket.requester || "未填写"}`;
   queueReceiptTask.textContent = `测试事项：${ticket.taskName}`;
-  queueReceiptCancel.hidden = ticket.status === "cancelled";
+  queueReceiptCancel.hidden = Boolean(QUEUE_CONFIG.queueUrl) || ticket.status === "cancelled";
   queueReceiptCancel.disabled = false;
   queueReceiptCancel.dataset.ticketId = ticket.id;
   queueReceiptCancel.title = "取消这个排队号";
