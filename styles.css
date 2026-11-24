@@ -1795,7 +1795,7 @@ body.style-editorial .topbar h2 {
 }
 
 body.style-editorial .topbar h2::before {
-  content: "设计月度规划 / 2026";
+  content: "测试月度取号规划 / 2026";
   display: block;
   margin-bottom: 8px;
   color: var(--muted);
