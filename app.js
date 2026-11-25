@@ -804,12 +804,12 @@ function queueCancelToken(id) {
   return localStorage.getItem(`${QUEUE_LOCAL_KEY}-cancel-${id}`) || "";
 }
 
-async function updateHostedQueueTicket(ticket, action, token, scheduledDate) {
+async function updateHostedQueueTicket(ticket, action, token, scheduledDate, taskName) {
   const response = await fetch(queueApiUrl(), {
     method: "PATCH",
     headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
     body: JSON.stringify({
-      id: ticket.id, action, scheduled_date: scheduledDate, previous_date: ticket.scheduledDate
+      id: ticket.id, action, scheduled_date: scheduledDate, previous_date: ticket.scheduledDate, task_name: taskName, previous_name: ticket.taskName
     })
   });
   if (!response.ok) throw new Error(`queue update failed: ${response.status}`);
@@ -1150,8 +1150,8 @@ function openViewerDialog(month, day, { refresh = true } = {}) {
       row.classList.add("with-date-action");
       const move = document.createElement("button");
       move.type = "button";
-      move.textContent = "修改日期";
-      move.setAttribute("aria-label", `修改「${item.label}」的日期`);
+      move.textContent = "修改";
+      move.setAttribute("aria-label", `修改「${item.label}」`);
       move.addEventListener("click", () => {
         openMoveItemDialog(item, formatDateKey(new Date(YEAR, month - 1, day, 12)));
       });
@@ -2181,7 +2181,7 @@ queueReceiptClose.addEventListener("click", () => queueReceiptDialog.close());
 queueReceiptDone.addEventListener("click", () => queueReceiptDialog.close());
 function openMoveItemDialog(item, date) {
   itemToMove = { ...item, date };
-  moveItemName.textContent = item.label;
+  moveItemName.value = item.label;
   moveItemDate.value = date;
   moveItemStatus.textContent = "";
   moveItemDialog.showModal();
@@ -2200,8 +2200,13 @@ moveItemForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const item = itemToMove;
   const date = moveItemDate.value;
-  if (!item || !date || date === item.date) {
-    moveItemStatus.textContent = "请选择不同的日期";
+  const name = moveItemName.value.trim();
+  if (!item || !date || !name) {
+    moveItemStatus.textContent = "请填写事项名称和日期";
+    return;
+  }
+  if (date === item.date && name === item.label) {
+    moveItemDialog.close();
     return;
   }
   const [, month, day] = date.split("-").map(Number);
@@ -2211,19 +2216,24 @@ moveItemForm.addEventListener("submit", async (event) => {
     if (item.ticket) {
       const ticket = item.ticket;
       const updated = QUEUE_CONFIG.queueUrl
-        ? await updateHostedQueueTicket(ticket, "move", "", date)
-        : { ...ticket, scheduledDate: date };
+        ? await updateHostedQueueTicket(ticket, "move", "", date, name)
+        : { ...ticket, scheduledDate: date, taskName: name };
       queueTickets = queueTickets.map((entry) => entry.id === ticket.id ? updated : entry);
       if (!queueRemoteEnabled()) saveLocalQueueTickets();
     } else {
       const [, oldMonth, oldDay] = item.date.split("-").map(Number);
       const destination = getPlannedTasks(month, day);
-      if (destination.includes(item.label)) {
+      if (destination.includes(name)) {
         moveItemStatus.textContent = "目标日期已有同名事项";
         return;
       }
-      setTasks(month, day, [...destination, item.label]);
-      setTasks(oldMonth, oldDay, getPlannedTasks(oldMonth, oldDay).filter((task) => task !== item.label));
+      addProjectIfNeeded(name, item.color);
+      if (date === item.date) {
+        setTasks(month, day, destination.map((task) => task === item.label ? name : task));
+      } else {
+        setTasks(month, day, [...destination, name]);
+        setTasks(oldMonth, oldDay, getPlannedTasks(oldMonth, oldDay).filter((task) => task !== item.label));
+      }
     }
     moveItemDialog.close();
     if (queueReceiptDialog.open) queueReceiptDialog.close();
@@ -2234,10 +2244,10 @@ moveItemForm.addEventListener("submit", async (event) => {
     selectionAnchor = day;
     renderAll();
     openViewerDialog(month, day, { refresh: false });
-    showToast("日期已修改");
+    showToast("事项已修改");
   } catch (error) {
     console.error(error);
-    moveItemStatus.textContent = "日期保存失败，事项可能已变更。请刷新后重试。";
+    moveItemStatus.textContent = "事项保存失败，事项可能已变更。请刷新后重试。";
   } finally {
     moveItemSubmit.disabled = false;
   }

@@ -222,22 +222,23 @@
       <p class="queue-receipt-task" id="queueReceiptRequester"></p>
       <div class="queue-receipt-actions">
         <button class="queue-receipt-delete" id="queueReceiptCancel" type="button">取消取号</button>
-        <button class="queue-receipt-done" id="queueReceiptMove" type="button">修改日期</button>
+        <button class="queue-receipt-done" id="queueReceiptMove" type="button">修改</button>
         <button class="queue-receipt-done" id="queueReceiptDone" type="button">知道了</button>
       </div>
     </dialog>
 
     <dialog class="queue-dialog" id="moveItemDialog" aria-labelledby="moveItemTitle">
       <div class="queue-dialog-header">
-        <h2 id="moveItemTitle">修改日期</h2>
-        <button class="icon-button" id="moveItemClose" type="button" aria-label="关闭修改日期">×</button>
+        <h2 id="moveItemTitle">修改事项</h2>
+        <button class="icon-button" id="moveItemClose" type="button" aria-label="关闭修改事项">×</button>
       </div>
       <form class="queue-form" id="moveItemForm">
-        <p id="moveItemName"></p>
-        <label for="moveItemDate">新日期</label>
+        <label for="moveItemName">事项名称</label>
+        <input id="moveItemName" type="text" maxlength="120" required />
+        <label for="moveItemDate">日期</label>
         <input id="moveItemDate" type="date" required />
         <p class="queue-form-status" id="moveItemStatus" role="status"></p>
-        <button class="queue-submit-button" id="moveItemSubmit" type="submit">保存日期</button>
+        <button class="queue-submit-button" id="moveItemSubmit" type="submit">保存</button>
       </form>
     </dialog>
 
@@ -246,6 +247,6 @@
     <script src="./queue-config.js?v=20261124-8"></script>
     <script src="./queue-admin-config.js"></script>
     <script src="./test-calendar-data.js?v=20261124-2"></script>
-    <script src="./app.js?v=20261124-12"></script>
+    <script src="./app.js?v=20261125-1"></script>
   </body>
 </html>
