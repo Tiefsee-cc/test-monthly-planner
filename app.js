@@ -527,6 +527,16 @@ function buildCalendarDays(month) {
   return cells;
 }
 
+function fetchPlannerRpc(name, args) {
+  const { supabaseUrl, supabasePublishableKey } = QUEUE_CONFIG;
+  return fetch(`${supabaseUrl.replace(/\/$/, "")}/rest/v1/rpc/${name}`, {
+    method: "POST",
+    cache: "no-store",
+    headers: { apikey: supabasePublishableKey, "Content-Type": "application/json" },
+    body: JSON.stringify(args)
+  });
+}
+
 function queueRemoteEnabled() {
   if (QUEUE_CONFIG.queueUrl) return true;
   return Boolean(String(QUEUE_CONFIG.supabaseUrl || "").trim() && String(QUEUE_CONFIG.supabaseAnonKey || "").trim());
@@ -569,10 +579,12 @@ async function loadQueueTickets({ rerender = true } = {}) {
   try {
     if (queueRemoteEnabled()) {
       const url = QUEUE_CONFIG.queueUrl || `${queueApiUrl()}?select=id,ticket_no,requester,task_name,scheduled_date,status,created_at&order=scheduled_date.asc,created_at.asc`;
-      const response = await fetch(url, {
+      const response = await (QUEUE_CONFIG.supabasePublishableKey
+        ? fetchPlannerRpc("planner_queue_list", {})
+        : fetch(url, {
         headers: queueApiHeaders(),
         cache: "no-store"
-      });
+      }));
       if (!response.ok) throw new Error(`queue fetch failed: ${response.status}`);
       const rows = await response.json();
       queueTickets = Array.isArray(rows) ? rows.map(normalizeQueueTicket) : [];
@@ -759,14 +771,16 @@ function buildQueuePayload(taskName, requester, date) {
 }
 
 async function insertRemoteQueueTicket(payload) {
-  const response = await fetch(queueApiUrl(), {
+  const response = await (QUEUE_CONFIG.supabasePublishableKey
+    ? fetchPlannerRpc("planner_queue_write", { p_payload: payload })
+    : fetch(queueApiUrl(), {
     method: "POST",
     headers: queueApiHeaders({
       "Content-Type": "application/json",
       Prefer: "return=representation"
     }),
     body: JSON.stringify(payload)
-  });
+  }));
 
   if (response.status === 409) {
     const error = new Error("queue slot conflict");
@@ -805,13 +819,17 @@ function queueCancelToken(id) {
 }
 
 async function updateHostedQueueTicket(ticket, action, token, scheduledDate, taskName) {
-  const response = await fetch(queueApiUrl(), {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-    body: JSON.stringify({
-      id: ticket.id, action, scheduled_date: scheduledDate, previous_date: ticket.scheduledDate, task_name: taskName, previous_name: ticket.taskName
-    })
-  });
+  const payload = {
+    id: ticket.id, action, scheduled_date: scheduledDate, previous_date: ticket.scheduledDate,
+    task_name: taskName, previous_name: ticket.taskName
+  };
+  const response = await (QUEUE_CONFIG.supabasePublishableKey
+    ? fetchPlannerRpc("planner_queue_write", { p_payload: { ...payload, cancel_token: token } })
+    : fetch(queueApiUrl(), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify(payload)
+      }));
   if (!response.ok) throw new Error(`queue update failed: ${response.status}`);
   const [row] = await response.json();
   return normalizeQueueTicket(row);
